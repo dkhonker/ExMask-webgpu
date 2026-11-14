@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ExMask · 字幕 — 用文字遮住一个人</title>
-<meta name="description" content="ExMask 字幕：在浏览器本地选中人物，用文字把 TA 遮住。YOLO11n-seg + MobileSAM + WebGPU，照片不上传。">
+<title>ExMask — 用文字遮住一个人</title>
+<meta name="description" content="ExMask：在浏览器本地选中人物，用文字把 TA 遮住。YOLO11n-seg + MobileSAM + WebGPU，照片不上传。">
 <meta name="theme-color" content="#101114">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ff5b35'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-family='Arial,sans-serif' font-size='25' font-weight='700' fill='%23111216'%3EEX%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,7 +18,6 @@
     <span class="brand-mark">EX</span>
     <span class="brand-lockup">
       <span class="brand-name">ExMask</span>
-      <span class="brand-cn">字幕</span>
     </span>
   </a>
 
@@ -43,6 +42,11 @@
       <button type="button" id="langZh" aria-pressed="true"><span>中文</span></button>
       <button type="button" id="langEn" aria-pressed="false"><span>EN</span></button>
     </div>
+  </div>
+
+  <div class="load-strip" id="loadStrip" hidden>
+    <div class="load-meta"><span data-i18n="modelLoading">模型加载中</span><span id="loadPct">0%</span></div>
+    <div class="load-track" id="loadTrack" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="loadBar"></i></div>
   </div>
 </header>
 
@@ -86,13 +90,13 @@
         <div class="markers" id="markers"></div>
         <div class="brush-cursor" id="brushCursor"></div>
         <div class="hint-pill" id="hint" hidden></div>
+        <button type="button" class="stage-change" id="changeBtn" data-i18n="change" hidden>换图</button>
       </div>
     </div>
 
     <div class="stage-foot">
       <div class="stage-actions">
         <button type="button" class="btn sm ghost" id="undoBtn" data-i18n="undo" hidden>撤销</button>
-        <button type="button" class="btn sm outline" id="changeBtn" data-i18n="change" hidden>换一张</button>
       </div>
       <div class="stage-meta"><span class="meta-key">LOCAL</span><span data-i18n="stageMeta">照片不离开浏览器</span></div>
     </div>
@@ -103,7 +107,7 @@
     <div class="inspector-head">
       <div>
         <div class="eyebrow">CONTROL ROOM</div>
-        <h2>ExMask <span>字幕</span></h2>
+        <h2>ExMask</h2>
       </div>
       <span class="live-tag">LIVE</span>
     </div>
@@ -113,6 +117,7 @@
         <div class="section-head">
           <span class="section-num">01</span>
           <div><h2 data-i18n="s1Title">选择要遮住的人</h2><p class="section-sub" data-i18n="s1Sub">先点选，再精修轮廓。</p></div>
+          <button type="button" class="btn sm outline repick" id="repickBtn" data-i18n="repick">重新选图</button>
         </div>
 
         <div id="peopleWrap" hidden>
@@ -343,7 +348,7 @@
 </div>
 
 <footer class="site-foot">
-  <span class="foot-brand">EXMASK / 字幕</span>
+  <span class="foot-brand">EXMASK</span>
   <span data-i18n="footer">文字是新的遮罩。</span>
   <span><span data-i18n="kvModel">模型</span> YOLO11n-seg + MobileSAM · WebGPU</span>
 </footer>

@@ -3,7 +3,7 @@ const I18N = {
   zh: {
     tag: '照片不上传', statusIdle: '等一张照片', pick: '选一张照片',
     introTitle: '把一个人，写进文字里。', introText: '选中人物，生成剪影，再用文字把 TA 盖住。所有计算都在你的浏览器里完成。', introTiny: '拖入、选择或直接粘贴。JPG / PNG。',
-    undo: '撤销', change: '换一张', s1: '选人', s2: '轮廓', s3: '文字', s4: '导出',
+    undo: '撤销', change: '换图', repick: '重新选图', s1: '选人', s2: '轮廓', s3: '文字', s4: '导出',
     s1Title: '选择要遮住的人', s1Sub: '先点选，再精修轮廓。', modelLoading: '模型加载中', modelReady: '本地模型已就绪', modelFail: '模型没加载出来，画笔仍可用',
     dropBig: '把照片拖到这里', dropSmall: '或者选择、粘贴一张', found: '识别到的人', foundNote: '点照片上的编号，或点下面的人。可以选多个。',
     refine: '精修选区', toolSelect: '点选', toolAdd: '画笔', toolSub: '橡皮', brushSize: '笔刷大小', clearMask: '清空选区', snapEdge: '贴合边缘',
@@ -24,7 +24,7 @@ const I18N = {
     errModelLoad: '模型下载失败。请检查网络后刷新页面。',
     errWebGPUInit: '显卡适配器存在，但 ONNX Runtime 无法创建 WebGPU 会话。请更新显卡驱动或换用 Chrome。',
     errInit: 'AI 初始化失败。请打开开发者工具查看具体错误。',
-    layerFree: '文字', layerFill: '填充', newText: '已被文字覆盖。', newFill: 'EXMASK / PRIVATE / ',
+    layerFree: '文字', layerFill: '填充', newText: '已被文字覆盖。', newFill: '404notfound',
     fontTypewriter: '打字机', fontCourier: '打字机，细', fontMarker: '马克笔', fontCaveat: '手写，轻', fontApple: '手写，花体', fontReenie: '手写，随手', fontMaShan: '毛笔楷书', fontZhiMang: '行书', fontLongCang: '龙藏', fontLiuJian: '草书', fontSerif: '衬线', fontSans: '黑体', fontPixel: '像素',
     toastSaved: '已导出', toastDeclined: '取消了保存', toastNoDl: '这里不能直接下载，长按预览图保存', toastNoPerson: '这里没识别到人，换个位置点试试', toastImgFail: '这张图打不开，换一张试试', toastBig: '图比较大，已缩到 1600px 处理',
     hintTap: '点一下要遮住的人', hintBrush: '按住涂抹选区', hintDrag: '拖动文字调整位置', personN: (i) => `第 ${i} 个人`,
@@ -33,7 +33,7 @@ const I18N = {
   en: {
     tag: 'photos stay on your device', statusIdle: 'Waiting for a photo', pick: 'Choose a photo',
     introTitle: 'Write someone out of the frame.', introText: 'Select a person, shape the cutout, then cover them with type. Everything stays in your browser.', introTiny: 'Drop, choose, or paste. JPG / PNG.',
-    undo: 'Undo', change: 'New photo', s1: 'Select', s2: 'Shape', s3: 'Type', s4: 'Export',
+    undo: 'Undo', change: 'New photo', repick: 'Choose another', s1: 'Select', s2: 'Shape', s3: 'Type', s4: 'Export',
     s1Title: 'Who gets masked?', s1Sub: 'Select first, refine second.', modelLoading: 'Loading model', modelReady: 'Local model ready', modelFail: 'Model failed to load. The brush still works.',
     dropBig: 'Drop a photo here', dropSmall: 'or choose one, or paste', found: 'People found', foundNote: 'Tap a number on the photo or a person below. You can pick several.',
     refine: 'Refine selection', toolSelect: 'Tap', toolAdd: 'Brush', toolSub: 'Eraser', brushSize: 'Brush size', clearMask: 'Clear selection', snapEdge: 'Snap to edges',
@@ -54,7 +54,7 @@ const I18N = {
     errModelLoad: 'Model download failed. Check your connection and reload.',
     errWebGPUInit: 'A GPU adapter exists, but ONNX Runtime could not create a WebGPU session. Update the graphics driver or try Chrome.',
     errInit: 'AI initialization failed. Open developer tools for the detailed error.',
-    layerFree: 'text', layerFill: 'fill', newText: 'Covered in type.', newFill: 'EXMASK / PRIVATE / ',
+    layerFree: 'text', layerFill: 'fill', newText: 'Covered in type.', newFill: '404notfound',
     fontTypewriter: 'Typewriter', fontCourier: 'Typewriter, light', fontMarker: 'Marker', fontCaveat: 'Handwritten', fontApple: 'Script', fontReenie: 'Scribble', fontMaShan: 'Brush (CN)', fontZhiMang: 'Running (CN)', fontLongCang: 'Long Cang (CN)', fontLiuJian: 'Cursive (CN)', fontSerif: 'Serif', fontSans: 'Sans', fontPixel: 'Pixel',
     toastSaved: 'Exported', toastDeclined: 'Save cancelled', toastNoDl: 'Direct download is not available here. Long-press the preview to save.', toastNoPerson: 'No person found there. Try tapping elsewhere.', toastImgFail: 'Could not open that image. Try another.', toastBig: 'Large photo scaled to 1600px for editing',
     hintTap: 'Tap the person to mask', hintBrush: 'Hold to paint the mask', hintDrag: 'Drag the text to move it', personN: (i) => `Person ${i}`,
@@ -128,7 +128,7 @@ const Engine = {
       let stage = 'gpu';
       this.error = null; this.errorCode = ''; this.adapterInfo = null;
       try {
-        onProgress && onProgress(0.05);
+        onProgress && onProgress(0.02);
         if (!navigator.gpu) { this.errorCode = 'no-webgpu'; throw new Error('WebGPU API unavailable'); }
         let adapter = null;
         try { adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }); } catch (e) { console.warn('high-performance adapter failed', e); }
@@ -136,23 +136,57 @@ const Engine = {
         if (!adapter) { this.errorCode = 'no-adapter'; throw new Error('WebGPU adapter unavailable'); }
         if (adapter.info) this.adapterInfo = { vendor: adapter.info.vendor, architecture: adapter.info.architecture, device: adapter.info.device, description: adapter.info.description };
         console.info('WebGPU adapter', this.adapterInfo || adapter);
+        onProgress && onProgress(0.08);
         stage = 'models';
         ort.env.wasm.wasmPaths = new URL('./ort/', location.href).href;
         ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency || 4);
-        const load = async (p) => {
-          const buf = await (await fetch(p)).arrayBuffer();
-          return ort.InferenceSession.create(buf, { executionProviders: ['webgpu'], graphOptimizationLevel: 'all' });
+        const fetchModel = async (url, slot) => {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`Failed to fetch model: ${url} (${res.status})`);
+          const total = Number(res.headers.get('content-length')) || 0;
+          let lastPct = -1;
+          const report = (frac) => {
+            const pct = Math.min(1, Math.max(0, frac));
+            if (pct < 1 && pct - lastPct < 0.005) return;
+            lastPct = pct;
+            onProgress && onProgress(0.08 + 0.74 * ((slot + pct) / 3));
+          };
+          if (!res.body || !total) {
+            const data = new Uint8Array(await res.arrayBuffer());
+            report(0.85);
+            return data;
+          }
+          const reader = res.body.getReader();
+          const chunks = [];
+          let loaded = 0;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            loaded += value.byteLength;
+            report(loaded / total * 0.85);
+          }
+          const data = new Uint8Array(loaded);
+          let offset = 0;
+          for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.byteLength; }
+          report(0.85);
+          return data;
+        };
+        const load = async (url, slot) => {
+          const data = await fetchModel(url, slot);
+          const session = await ort.InferenceSession.create(data, { executionProviders: ['webgpu'], graphOptimizationLevel: 'all' });
+          onProgress && onProgress(0.08 + 0.74 * ((slot + 1) / 3));
+          return session;
         };
         const base = './models/';
-        this.yolo = await load(base + 'yolo11n-seg.onnx');
-        onProgress && onProgress(0.4);
-        this.enc = await load(base + 'encoder.onnx');
-        onProgress && onProgress(0.8);
-        this.dec = await load(base + 'decoder.onnx');
+        this.yolo = await load(base + 'yolo11n-seg.onnx', 0);
+        this.enc = await load(base + 'encoder.onnx', 1);
+        this.dec = await load(base + 'decoder.onnx', 2);
         if (!new URLSearchParams(location.search).has('nowarm')) {
           await this.warmYoloOnly();
-          onProgress && onProgress(0.92);
+          onProgress && onProgress(0.88);
           await this.warmSamOnly();
+          onProgress && onProgress(0.96);
         }
         onProgress && onProgress(1);
         this.ready = true;
@@ -542,6 +576,22 @@ async function saveStandalone(blob, filename) {
 function syncRange(el) { const min = +el.min || 0, max = +el.max || 100; const pct = ((+el.value - min) / (max - min)) * 100; el.style.setProperty('--pct', pct.toFixed(2) + '%'); }
 function toast(msg, ms = 2200) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), ms); }
 function setStatus(text, mode) { $('statusText').textContent = text; const st = $('status'); st.className = 'status' + (mode ? ' ' + mode : ''); st.hidden = !S.img; }
+function setModelProgress(p) {
+  const n = Math.round(Math.max(0, Math.min(1, Number(p) || 0)) * 100);
+  const introBar = document.querySelector('#modelProgress i');
+  if (introBar) introBar.style.width = n + '%';
+  const strip = $('loadStrip'), bar = $('loadBar'), pct = $('loadPct'), track = $('loadTrack');
+  if (strip) strip.hidden = false;
+  if (bar) bar.style.width = n + '%';
+  if (pct) pct.textContent = n + '%';
+  if (track) track.setAttribute('aria-valuenow', String(n));
+}
+function hideModelProgress(delay = 600) {
+  setTimeout(() => {
+    const intro = $('modelProgress'); if (intro) intro.hidden = true;
+    const strip = $('loadStrip'); if (strip) strip.hidden = true;
+  }, delay);
+}
 function engineErrorMessage() {
   const code = Engine.errorCode;
   if (code === 'no-webgpu') return t('errNoWebGPU');
@@ -874,7 +924,7 @@ function goStep(n) {
   S.step = n;
   [1, 2, 3, 4].forEach(k => { $('step' + k).hidden = k !== n; $('tab' + k).setAttribute('aria-selected', k === n); });
   if (n !== 1) setTool('select', true); else setTool(S.tool, true);
-  if (n === 3 && !S.layers.length) addLayer('free');
+  if (n === 3 && !S.layers.length) addLayer('fill');
   if (n === 3) { FONTS.filter(f => f.cjk).forEach(f => ensureFont(f, '再见')); FONTS.filter(f => !f.cjk).forEach(f => ensureFont(f, '')); }
   const img = $('previewImg'), pv = $('preview');
   img.hidden = n !== 4; pv.style.visibility = n === 4 ? 'hidden' : 'visible';
@@ -903,7 +953,7 @@ function updateHint() {
   const brushWorkRadius = (p) => S.brush / 2 * p.scale;
   function ptInPoly(x, y, pts) { let inside = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1]; if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside; } return inside; }
   frame.addEventListener('pointerdown', (e) => {
-    if (!S.work || e.button > 0) return; frame.setPointerCapture(e.pointerId);
+    if (!S.work || e.button > 0 || e.target.closest('button')) return; frame.setPointerCapture(e.pointerId);
     const p = toWork(e); down = true; moved = false; start = p; lastPt = p;
     if (S.step === 1 && S.tool !== 'select') { pushUndo(); paintAt(p.x, p.y, brushWorkRadius(p), S.tool === 'add'); S.maskVer++; renderPreview(); e.preventDefault(); }
     else if (S.step === 3) {
@@ -944,7 +994,8 @@ function wire() {
   $('langZh').addEventListener('click', () => setLang('zh')); $('langEn').addEventListener('click', () => setLang('en'));
   // file pick / drop / paste
   const fi = $('fileInput');
-  ['pickBtn', 'changeBtn'].forEach(id => $(id).addEventListener('click', () => { fi.value = ''; fi.click(); }));
+  const choosePhoto = () => { fi.value = ''; fi.click(); };
+  ['pickBtn', 'changeBtn', 'repickBtn'].forEach(id => $(id).addEventListener('click', choosePhoto));
   fi.addEventListener('change', () => { if (fi.files[0]) loadImageFile(fi.files[0]); });
   [$('stage'), $('panel'), document.body].forEach(el => {
     el.addEventListener('dragover', e => { e.preventDefault(); });
@@ -1005,10 +1056,9 @@ function wire() {
   [2, 3, 4].forEach(n => $('tab' + n).disabled = true); setTool('select', true); $('panel').hidden = true;
   applyLang();
   // engine preload
-  const bar = $('modelProgress').firstElementChild;
-  Engine.init(p => { bar.style.width = Math.round(p * 100) + '%'; }).then(() => { setTimeout(() => $('modelProgress').hidden = true, 600); if (S.work && !S.people.length) detectPeople(); })
+  Engine.init(p => setModelProgress(p)).then(() => { hideModelProgress(600); if (S.work && !S.people.length) detectPeople(); })
     .catch(() => {
-      $('modelProgress').hidden = true;
+      hideModelProgress(0);
       const msg = engineErrorMessage();
       toast(msg, 7000);
       if (S.work) { setStatus(msg, 'err'); setTool('add'); }

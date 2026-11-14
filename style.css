@@ -92,7 +92,6 @@ img { max-width: 100%; }
 }
 .brand-lockup { display: flex; align-items: baseline; gap: 9px; }
 .brand-name { font-size: 18px; font-weight: 700; letter-spacing: -.03em; }
-.brand-cn { font-size: 12px; color: var(--cream-muted); letter-spacing: .12em; }
 .top-actions { display: flex; align-items: center; gap: 12px; }
 .privacy-badge {
   display: inline-flex;
@@ -146,6 +145,19 @@ img { max-width: 100%; }
 .steps .ck { display: none; margin-left: auto; font-size: 10px; }
 .steps button.done .ck { display: inline; color: #99e5b0; }
 .steps button[aria-selected="true"] .ck { color: var(--ink); }
+.load-strip { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding-top: 2px; }
+.load-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: max-content;
+  color: var(--cream-muted);
+  font: 500 9px/1 var(--mono);
+  letter-spacing: .04em;
+}
+.load-meta #loadPct { color: var(--accent); font-variant-numeric: tabular-nums; }
+.load-track { flex: 1; height: 3px; overflow: hidden; border-radius: 1px; background: rgba(255,255,255,.12); }
+.load-track i { display: block; width: 0; height: 100%; background: var(--accent); transition: width .18s linear; }
 
 /* ---------- studio layout ---------- */
 .studio {
@@ -287,6 +299,22 @@ img { max-width: 100%; }
   pointer-events: none;
   backdrop-filter: blur(10px);
 }
+.stage-change {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 6;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 5px;
+  background: rgba(10,11,14,.72);
+  color: var(--cream);
+  font: 600 11px/1 var(--sans);
+  backdrop-filter: blur(10px);
+  transition: background-color .14s var(--ease), color .14s var(--ease), border-color .14s var(--ease);
+}
+.stage-change:hover { border-color: var(--accent); background: var(--accent); color: var(--ink); }
 
 /* ---------- intro ---------- */
 .intro {
@@ -384,6 +412,8 @@ img { max-width: 100%; }
   padding: 9px 2px 0;
 }
 .stage-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.stage-foot .btn { border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.05); color: var(--cream); }
+.stage-foot .btn:hover:not(:disabled) { background: rgba(255,255,255,.12); color: #fff; }
 .stage-meta { display: inline-flex; align-items: center; gap: 8px; color: #706f69; font: 500 9px/1.2 var(--mono); letter-spacing: .04em; }
 .meta-key { padding: 3px 5px; border: 1px solid rgba(255,255,255,.13); border-radius: 3px; color: #a7a39a; }
 
@@ -416,6 +446,7 @@ img { max-width: 100%; }
 .step { display: flex; flex-direction: column; gap: 18px; padding: 22px 20px 24px; }
 .section-head { display: flex; align-items: flex-start; gap: 12px; }
 .section-num { flex: none; padding-top: 3px; color: var(--accent-deep); font: 600 10px/1 var(--mono); letter-spacing: .08em; }
+.section-head .repick { flex: none; margin-left: auto; align-self: flex-start; }
 .section-head h2 { font-size: 18px; font-weight: 700; letter-spacing: -.035em; line-height: 1.18; }
 .section-sub { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .rule { width: 100%; height: 1px; margin: 1px 0; border: 0; background: var(--line); }
@@ -783,6 +814,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
   .brand { grid-column: 1; }
   .top-actions { grid-column: 2; }
   .steps { grid-column: 1 / -1; grid-row: 2; }
+  .load-strip { grid-row: 3; }
   .steps button { min-width: 0; padding: 0 6px; gap: 4px; font-size: 10px; }
   .steps .step-label { display: inline; }
   .brand-name { font-size: 16px; }
