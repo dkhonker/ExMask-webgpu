@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ExMask · 字幕 — 用文字遮住一个人</title>
+<meta name="description" content="ExMask 字幕：在浏览器本地选中人物，用文字把 TA 遮住。YOLO11n-seg + MobileSAM + WebGPU，照片不上传。">
+<meta name="theme-color" content="#101114">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ff5b35'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-family='Arial,sans-serif' font-size='25' font-weight='700' fill='%23111216'%3EEX%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="./" aria-label="ExMask">
+    <span class="brand-mark">EX</span>
+    <span class="brand-lockup">
+      <span class="brand-name">ExMask</span>
+      <span class="brand-cn">字幕</span>
+    </span>
+  </a>
+
+  <nav class="steps" role="tablist" aria-label="Workflow">
+    <button type="button" role="tab" id="tab1" aria-selected="true" data-step="1">
+      <span class="step-num">01</span><span class="step-label" data-i18n="s1">选人</span><span class="ck">✓</span>
+    </button>
+    <button type="button" role="tab" id="tab2" aria-selected="false" data-step="2" disabled>
+      <span class="step-num">02</span><span class="step-label" data-i18n="s2">轮廓</span><span class="ck">✓</span>
+    </button>
+    <button type="button" role="tab" id="tab3" aria-selected="false" data-step="3" disabled>
+      <span class="step-num">03</span><span class="step-label" data-i18n="s3">文字</span><span class="ck">✓</span>
+    </button>
+    <button type="button" role="tab" id="tab4" aria-selected="false" data-step="4" disabled>
+      <span class="step-num">04</span><span class="step-label" data-i18n="s4">导出</span><span class="ck">✓</span>
+    </button>
+  </nav>
+
+  <div class="top-actions">
+    <span class="privacy-badge"><span class="live-dot"></span><span data-i18n="tag">照片不上传</span></span>
+    <div class="seg sm lang" role="group" aria-label="Language">
+      <button type="button" id="langZh" aria-pressed="true"><span>中文</span></button>
+      <button type="button" id="langEn" aria-pressed="false"><span>EN</span></button>
+    </div>
+  </div>
+</header>
+
+<div class="studio">
+  <main class="workarea" id="stageWrap">
+    <div class="workarea-head">
+      <div class="eyebrow"><span class="live-dot"></span> CANVAS / WEBGPU</div>
+      <div class="status" id="status" hidden><span class="dot"></span><span id="statusText" data-i18n="statusIdle">等一张照片</span></div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="intro" id="intro">
+        <div class="intro-copy">
+          <div class="kicker"><span>EXMASK / PRIVACY STUDIO</span><span>2026</span></div>
+          <h1 data-i18n="introTitle">把一个人，写进文字里。</h1>
+          <p class="intro-lede" data-i18n="introText">选中人物，生成剪影，再用文字把 TA 盖住。所有计算都在你的浏览器里完成。</p>
+          <div class="intro-cta">
+            <button type="button" class="btn primary lg" id="pickBtn" data-i18n="pick">选一张照片</button>
+            <span class="intro-tiny" data-i18n="introTiny">拖入、选择或直接粘贴。JPG / PNG。</span>
+          </div>
+          <div class="intro-specs">
+            <div class="spec"><span class="spec-k">01 / DETECT</span><span class="spec-v">YOLO11n-seg</span></div>
+            <div class="spec"><span class="spec-k">02 / SEGMENT</span><span class="spec-v">MobileSAM</span></div>
+            <div class="spec"><span class="spec-k">03 / RENDER</span><span class="spec-v">WebGPU</span></div>
+          </div>
+          <div class="progress intro-progress" id="modelProgress"><i></i></div>
+        </div>
+
+        <div class="intro-visual">
+          <figure class="demo-card">
+            <img class="demo" src="example.jpg?v=6" alt="" width="1000" height="1000">
+            <figcaption><span>EXMASK</span><span>TEXT AS A MASK</span></figcaption>
+          </figure>
+          <div class="demo-note"><span class="note-line"></span>100% LOCAL / NO UPLOAD</div>
+        </div>
+      </div>
+
+      <div class="frame" id="frame" hidden>
+        <canvas id="preview"></canvas>
+        <img id="previewImg" alt="" draggable="false">
+        <div class="markers" id="markers"></div>
+        <div class="brush-cursor" id="brushCursor"></div>
+        <div class="hint-pill" id="hint" hidden></div>
+      </div>
+    </div>
+
+    <div class="stage-foot">
+      <div class="stage-actions">
+        <button type="button" class="btn sm ghost" id="undoBtn" data-i18n="undo" hidden>撤销</button>
+        <button type="button" class="btn sm outline" id="changeBtn" data-i18n="change" hidden>换一张</button>
+      </div>
+      <div class="stage-meta"><span class="meta-key">LOCAL</span><span data-i18n="stageMeta">照片不离开浏览器</span></div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" class="sr" aria-label="photo">
+  </main>
+
+  <aside class="inspector" id="panel" hidden>
+    <div class="inspector-head">
+      <div>
+        <div class="eyebrow">CONTROL ROOM</div>
+        <h2>ExMask <span>字幕</span></h2>
+      </div>
+      <span class="live-tag">LIVE</span>
+    </div>
+
+    <div class="panel-scroll">
+      <section class="step" id="step1" role="tabpanel">
+        <div class="section-head">
+          <span class="section-num">01</span>
+          <div><h2 data-i18n="s1Title">选择要遮住的人</h2><p class="section-sub" data-i18n="s1Sub">先点选，再精修轮廓。</p></div>
+        </div>
+
+        <div id="peopleWrap" hidden>
+          <div class="field">
+            <div class="lab"><span data-i18n="found">识别到的人</span><span class="val" id="foundCount"></span></div>
+            <div class="person-list" id="personList"></div>
+            <p class="note" data-i18n="foundNote">点照片上的编号，或点下面的人。可以选多个。</p>
+          </div>
+        </div>
+
+        <hr class="rule">
+
+        <div class="field">
+          <div class="lab"><span data-i18n="refine">精修选区</span><span class="mono-tag">BRUSH</span></div>
+          <div class="seg fill" role="group" id="toolSeg">
+            <button type="button" id="toolSelect" aria-pressed="true"><span data-i18n="toolSelect">点选</span></button>
+            <button type="button" id="toolAdd" aria-pressed="false"><span data-i18n="toolAdd">画笔</span></button>
+            <button type="button" id="toolSub" aria-pressed="false"><span data-i18n="toolSub">橡皮</span></button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="lab"><span data-i18n="brushSize">笔刷大小</span><span class="val" id="brushVal">40</span></div>
+          <input type="range" id="brushSize" min="6" max="160" value="40">
+        </div>
+
+        <div class="btn-row">
+          <button type="button" class="btn sm outline" id="clearMask" data-i18n="clearMask">清空选区</button>
+          <button type="button" class="btn sm outline" id="snapEdge" data-i18n="snapEdge">贴合边缘</button>
+        </div>
+        <p class="note" data-i18n="refineNote">画笔补上漏掉的，橡皮擦掉多出来的，贴合边缘让选区顺着轮廓走。</p>
+
+        <div class="step-actions">
+          <button type="button" class="btn primary wide" id="next1" data-i18n="nextStyle" disabled>下一步，做轮廓</button>
+        </div>
+      </section>
+
+      <section class="step" id="step2" role="tabpanel" hidden>
+        <div class="section-head">
+          <span class="section-num">02</span>
+          <div><h2 data-i18n="s2Title">轮廓与质感</h2><p class="section-sub" data-i18n="s2Sub">决定遮罩的形状和边缘。</p></div>
+        </div>
+
+        <div class="field">
+          <div class="lab"><span data-i18n="photoFilter">照片</span></div>
+          <div class="seg fill" role="group" id="filterSeg">
+            <button type="button" data-filter="none" aria-pressed="true"><span data-i18n="filterColor">原色</span></button>
+            <button type="button" data-filter="bw" aria-pressed="false"><span data-i18n="filterBw">黑白</span></button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="lab"><span data-i18n="fillColor">遮罩颜色</span><span class="val" id="fillVal">#FFFFFF</span></div>
+          <div class="swatches" id="fillSwatches"></div>
+        </div>
+
+        <div class="field">
+          <div class="lab"><span data-i18n="opacity">不透明度</span><span class="val" id="opacityVal">100%</span></div>
+          <input type="range" id="opacity" min="20" max="100" value="100">
+        </div>
+
+        <hr class="rule">
+
+        <div class="field">
+          <div class="lab"><span data-i18n="edge">边缘质感</span><span class="mono-tag">STYLE</span></div>
+          <div class="seg fill" role="group" id="edgeSeg">
+            <button type="button" data-edge="rough" aria-pressed="true"><span data-i18n="edgeRough">撕纸</span></button>
+            <button type="button" data-edge="speckle" aria-pressed="false"><span data-i18n="edgeSpeckle">颗粒</span></button>
+            <button type="button" data-edge="smooth" aria-pressed="false"><span data-i18n="edgeSmooth">平滑</span></button>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div class="field">
+            <div class="lab"><span data-i18n="rough">粗糙度</span><span class="val" id="roughVal">50</span></div>
+            <input type="range" id="rough" min="0" max="100" value="50">
+          </div>
+          <div class="field">
+            <div class="lab"><span data-i18n="expand">外扩</span><span class="val" id="expandVal">+6</span></div>
+            <input type="range" id="expand" min="-20" max="40" value="6">
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button type="button" class="btn sm outline" id="reroll" data-i18n="reroll">换一种纹理</button>
+        </div>
+
+        <hr class="rule">
+
+        <div class="switch-row">
+          <div><div class="t" data-i18n="outline">描边</div><div class="d" data-i18n="outlineDesc">在遮罩外圈加一条边</div></div>
+          <button type="button" class="switch" id="outlineSwitch" role="switch" aria-checked="false" aria-label="outline"></button>
+        </div>
+
+        <div id="outlineOpts" hidden>
+          <div class="row2">
+            <div class="field">
+              <div class="lab"><span data-i18n="outlineWidth">宽度</span><span class="val" id="outlineVal">8</span></div>
+              <input type="range" id="outlineWidth" min="1" max="40" value="8">
+            </div>
+            <div class="field">
+              <div class="lab"><span data-i18n="outlineColor">颜色</span></div>
+              <div class="swatches" id="outlineSwatches"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-actions">
+          <button type="button" class="btn ghost" id="back2" data-i18n="back">返回</button>
+          <button type="button" class="btn primary" id="next2" data-i18n="nextText">下一步，排版</button>
+        </div>
+      </section>
+
+      <section class="step" id="step3" role="tabpanel" hidden>
+        <div class="section-head">
+          <span class="section-num">03</span>
+          <div><h2 data-i18n="s3Title">用文字盖住 TA</h2><p class="section-sub" data-i18n="s3Sub">拖动文字，调整位置。</p></div>
+        </div>
+
+        <div class="field">
+          <div class="lab"><span data-i18n="layers">文字图层</span><span class="mono-tag">TYPE</span></div>
+          <div class="layers" id="layers"></div>
+          <div class="btn-row">
+            <button type="button" class="btn sm outline" id="addText" data-i18n="addText">加一段文字</button>
+            <button type="button" class="btn sm outline" id="addFill" data-i18n="addFill">用文字填满</button>
+          </div>
+        </div>
+
+        <div id="textEditor" class="text-editor" hidden>
+          <div class="field">
+            <label for="textInput" data-i18n="content">内容</label>
+            <textarea id="textInput" rows="3"></textarea>
+          </div>
+
+          <div class="field">
+            <div class="lab"><span data-i18n="font">字体</span></div>
+            <div class="fontgrid" id="fontGrid"></div>
+          </div>
+
+          <div class="row2">
+            <div class="field">
+              <div class="lab"><span data-i18n="size">字号</span><span class="val" id="sizeVal">5%</span></div>
+              <input type="range" id="textSize" min="1" max="20" step="0.25" value="5">
+            </div>
+            <div class="field">
+              <div class="lab"><span data-i18n="rotate">旋转</span><span class="val" id="rotVal">0°</span></div>
+              <input type="range" id="textRot" min="-45" max="45" value="0">
+            </div>
+          </div>
+
+          <div class="row2">
+            <div class="field">
+              <div class="lab"><span data-i18n="letterSpacing">字距</span><span class="val" id="lsVal">0</span></div>
+              <input type="range" id="textLs" min="-5" max="40" value="0">
+            </div>
+            <div class="field">
+              <div class="lab"><span data-i18n="lineHeight">行距</span><span class="val" id="lhVal">1.3</span></div>
+              <input type="range" id="textLh" min="0.8" max="2.4" step="0.05" value="1.3">
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="lab"><span data-i18n="textColor">颜色</span><span class="val" id="textColorVal">#111111</span></div>
+            <div class="swatches" id="textSwatches"></div>
+          </div>
+
+          <div class="field">
+            <div class="lab"><span data-i18n="align">对齐</span></div>
+            <div class="btn-row inline-center">
+              <div class="seg sm" role="group" id="alignSeg">
+                <button type="button" data-align="left" aria-pressed="false"><span data-i18n="alignLeft">左</span></button>
+                <button type="button" data-align="center" aria-pressed="true"><span data-i18n="alignCenter">中</span></button>
+                <button type="button" data-align="right" aria-pressed="false"><span data-i18n="alignRight">右</span></button>
+              </div>
+              <button type="button" class="chip" id="vertical" aria-pressed="false" data-i18n="vertical">竖排</button>
+            </div>
+          </div>
+
+          <div class="switch-row">
+            <div><div class="t" data-i18n="clipLabel">文字只留在剪影里</div><div class="d" data-i18n="clipDesc">关掉就能写到照片任何地方</div></div>
+            <button type="button" class="switch" id="clipSwitch" role="switch" aria-checked="true" aria-label="clip"></button>
+          </div>
+
+          <div class="btn-row">
+            <button type="button" class="btn sm outline" id="centerText" data-i18n="centerText">放回剪影中间</button>
+            <button type="button" class="btn sm ghost" id="delText" data-i18n="delText">删除这段</button>
+          </div>
+        </div>
+
+        <div class="step-actions">
+          <button type="button" class="btn ghost" id="back3" data-i18n="back">返回</button>
+          <button type="button" class="btn primary" id="next3" data-i18n="nextSave">下一步，导出</button>
+        </div>
+      </section>
+
+      <section class="step" id="step4" role="tabpanel" hidden>
+        <div class="section-head">
+          <span class="section-num">04</span>
+          <div><h2 data-i18n="s4Title">导出</h2><p class="section-sub" id="exportSize"></p></div>
+        </div>
+
+        <div class="export-card">
+          <span class="export-kicker">FINAL OUTPUT</span>
+          <strong data-i18n="exportReady">文字已经变成遮罩。</strong>
+          <span class="note" data-i18n="exportNote">选择格式后导出，照片不会上传。</span>
+        </div>
+
+        <div class="field">
+          <div class="lab"><span data-i18n="format">格式</span></div>
+          <div class="seg" role="group" id="fmtSeg">
+            <button type="button" id="fmtJpg" aria-pressed="true"><span>JPG</span></button>
+            <button type="button" id="fmtPng" aria-pressed="false"><span>PNG</span></button>
+          </div>
+        </div>
+
+        <div class="step-actions">
+          <button type="button" class="btn primary lg wide" id="saveBtn" data-i18n="save">导出图片</button>
+        </div>
+        <p class="hint" id="saveNote" data-i18n="saveNote">手机上也可以长按预览图保存。</p>
+
+        <div class="step-actions">
+          <button type="button" class="btn ghost" id="back4" data-i18n="back">返回</button>
+          <button type="button" class="btn outline" id="restart" data-i18n="restart">再做一张</button>
+        </div>
+      </section>
+    </div>
+  </aside>
+</div>
+
+<footer class="site-foot">
+  <span class="foot-brand">EXMASK / 字幕</span>
+  <span data-i18n="footer">文字是新的遮罩。</span>
+  <span><span data-i18n="kvModel">模型</span> YOLO11n-seg + MobileSAM · WebGPU</span>
+</footer>
+
+<div class="toast" id="toast" role="status"></div>
+<script src="./ort/ort.webgpu.min.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>

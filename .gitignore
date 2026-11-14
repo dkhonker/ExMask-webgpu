@@ -1,0 +1,4 @@
+_preview/
+_test/
+serve.py
+*.log
