@@ -19,6 +19,11 @@ const I18N = {
     footer: '文字是新的遮罩。', stageMeta: '照片不离开浏览器',
     stLoading: '正在加载本地模型，首次约 81MB', stDetecting: '正在定位人物', stFound: (n) => n ? `找到 ${n} 个人，点一下要遮住的那个` : '没框出人，直接在照片上点那个人',
     stSegmenting: '正在生成人物轮廓', stSelected: (n) => `已遮住 ${n} 个人`, stNoModel: 'AI 不可用，用画笔手动涂抹', stPainting: '正在优化边缘', stExporting: '正在渲染高清图',
+    errNoWebGPU: '这个浏览器没有 WebGPU。请用最新版 Edge 或 Chrome 打开，不要用应用内浏览器。',
+    errNoAdapter: 'WebGPU 拿不到显卡适配器。请完全退出并重启浏览器，确认硬件加速已开启。',
+    errModelLoad: '模型下载失败。请检查网络后刷新页面。',
+    errWebGPUInit: '显卡适配器存在，但 ONNX Runtime 无法创建 WebGPU 会话。请更新显卡驱动或换用 Chrome。',
+    errInit: 'AI 初始化失败。请打开开发者工具查看具体错误。',
     layerFree: '文字', layerFill: '填充', newText: '已被文字覆盖。', newFill: 'EXMASK / PRIVATE / ',
     fontTypewriter: '打字机', fontCourier: '打字机，细', fontMarker: '马克笔', fontCaveat: '手写，轻', fontApple: '手写，花体', fontReenie: '手写，随手', fontMaShan: '毛笔楷书', fontZhiMang: '行书', fontLongCang: '龙藏', fontLiuJian: '草书', fontSerif: '衬线', fontSans: '黑体', fontPixel: '像素',
     toastSaved: '已导出', toastDeclined: '取消了保存', toastNoDl: '这里不能直接下载，长按预览图保存', toastNoPerson: '这里没识别到人，换个位置点试试', toastImgFail: '这张图打不开，换一张试试', toastBig: '图比较大，已缩到 1600px 处理',
@@ -44,6 +49,11 @@ const I18N = {
     footer: 'Text is the new mask.', stageMeta: 'Your photo never leaves the browser',
     stLoading: 'Loading local models, about 81MB the first time', stDetecting: 'Finding people', stFound: (n) => n ? `Found ${n} ${n === 1 ? 'person' : 'people'}. Tap the one to mask.` : 'No one boxed. Tap the person on the photo.',
     stSegmenting: 'Tracing the cutout', stSelected: (n) => `${n} masked`, stNoModel: 'AI unavailable. Paint the mask by hand.', stPainting: 'Refining edges', stExporting: 'Rendering full size',
+    errNoWebGPU: 'This browser has no WebGPU. Open the site in the latest Edge or Chrome, not an in-app browser.',
+    errNoAdapter: 'WebGPU could not get a GPU adapter. Fully quit and restart the browser, and keep hardware acceleration enabled.',
+    errModelLoad: 'Model download failed. Check your connection and reload.',
+    errWebGPUInit: 'A GPU adapter exists, but ONNX Runtime could not create a WebGPU session. Update the graphics driver or try Chrome.',
+    errInit: 'AI initialization failed. Open developer tools for the detailed error.',
     layerFree: 'text', layerFill: 'fill', newText: 'Covered in type.', newFill: 'EXMASK / PRIVATE / ',
     fontTypewriter: 'Typewriter', fontCourier: 'Typewriter, light', fontMarker: 'Marker', fontCaveat: 'Handwritten', fontApple: 'Script', fontReenie: 'Scribble', fontMaShan: 'Brush (CN)', fontZhiMang: 'Running (CN)', fontLongCang: 'Long Cang (CN)', fontLiuJian: 'Cursive (CN)', fontSerif: 'Serif', fontSans: 'Sans', fontPixel: 'Pixel',
     toastSaved: 'Exported', toastDeclined: 'Save cancelled', toastNoDl: 'Direct download is not available here. Long-press the preview to save.', toastNoPerson: 'No person found there. Try tapping elsewhere.', toastImgFail: 'Could not open that image. Try another.', toastBig: 'Large photo scaled to 1600px for editing',
@@ -107,7 +117,7 @@ async function ensureFont(f, text) {
 const YOLO_INPUT = 640, SAM_INPUT = 1024;
 const SAM_MEAN = [123.675, 116.28, 103.53], SAM_STD = [58.395, 57.12, 57.375];
 const Engine = {
-  ready: false, failed: false, loading: null,
+  ready: false, failed: false, loading: null, error: null, errorCode: '', adapterInfo: null,
   yolo: null, enc: null, dec: null, emb: null, embFor: null,
   warmYolo: null, warmSam: null,
   queue: Promise.resolve(),
@@ -115,11 +125,18 @@ const Engine = {
   async init(onProgress) {
     if (this.loading) return this.loading;
     this.loading = (async () => {
+      let stage = 'gpu';
+      this.error = null; this.errorCode = ''; this.adapterInfo = null;
       try {
         onProgress && onProgress(0.05);
-        if (!navigator.gpu) throw new Error('当前浏览器不支持 WebGPU');
-        const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-        if (!adapter) throw new Error('没有可用的 WebGPU 显卡');
+        if (!navigator.gpu) { this.errorCode = 'no-webgpu'; throw new Error('WebGPU API unavailable'); }
+        let adapter = null;
+        try { adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }); } catch (e) { console.warn('high-performance adapter failed', e); }
+        if (!adapter) { try { adapter = await navigator.gpu.requestAdapter(); } catch (e) { console.warn('default adapter failed', e); } }
+        if (!adapter) { this.errorCode = 'no-adapter'; throw new Error('WebGPU adapter unavailable'); }
+        if (adapter.info) this.adapterInfo = { vendor: adapter.info.vendor, architecture: adapter.info.architecture, device: adapter.info.device, description: adapter.info.description };
+        console.info('WebGPU adapter', this.adapterInfo || adapter);
+        stage = 'models';
         ort.env.wasm.wasmPaths = new URL('./ort/', location.href).href;
         ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency || 4);
         const load = async (p) => {
@@ -139,7 +156,15 @@ const Engine = {
         }
         onProgress && onProgress(1);
         this.ready = true;
-      } catch (e) { console.error('engine init failed', e); this.failed = true; throw e; }
+      } catch (e) {
+        this.error = e;
+        if (!this.errorCode) {
+          this.errorCode = stage === 'gpu' ? 'gpu-init' : stage === 'models' ? (/webgpu|gpu|adapter/i.test(e && e.message || '') ? 'webgpu-init' : 'model-load') : 'init';
+        }
+        console.error('engine init failed', this.errorCode, e);
+        this.failed = true;
+        throw e;
+      }
     })();
     return this.loading;
   },
@@ -517,6 +542,14 @@ async function saveStandalone(blob, filename) {
 function syncRange(el) { const min = +el.min || 0, max = +el.max || 100; const pct = ((+el.value - min) / (max - min)) * 100; el.style.setProperty('--pct', pct.toFixed(2) + '%'); }
 function toast(msg, ms = 2200) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), ms); }
 function setStatus(text, mode) { $('statusText').textContent = text; const st = $('status'); st.className = 'status' + (mode ? ' ' + mode : ''); st.hidden = !S.img; }
+function engineErrorMessage() {
+  const code = Engine.errorCode;
+  if (code === 'no-webgpu') return t('errNoWebGPU');
+  if (code === 'no-adapter') return t('errNoAdapter');
+  if (code === 'model-load') return t('errModelLoad');
+  if (code === 'webgpu-init') return t('errWebGPUInit');
+  return t('errInit');
+}
 function hint(text) { const h = $('hint'); if (!text) { h.hidden = true; return; } h.textContent = text; h.hidden = false; }
 function applyLang() {
   document.querySelectorAll('[data-i18n]').forEach(el => { const v = I18N[LANG][el.dataset.i18n]; if (typeof v === 'string') el.textContent = v; });
@@ -524,7 +557,7 @@ function applyLang() {
   document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
   buildFontGrid(); renderLayerList(); renderPeopleList(); if (activeLayer()) syncEditor();
   if (!S.img) setStatus(t('statusIdle'));
-  else if (Engine.failed) setStatus(t('stNoModel'));
+  else if (Engine.failed) setStatus(engineErrorMessage(), 'err');
   else if (S.detecting) setStatus(t('stDetecting'), 'busy');
   else if (S.busy) setStatus(t('stPainting'), 'busy');
   else if (maskHasContent()) setStatus(t('stSelected', selectedCount() || 1), 'ok');
@@ -567,7 +600,7 @@ async function detectPeople() {
   if (!S.work || S.detecting) return; S.detecting = true;
   if (!Engine.ready) {
     setStatus(t('stLoading'), 'busy');
-    try { await Engine.init(); } catch (e) { setStatus(t('stNoModel')); setTool('add'); S.detecting = false; return; }
+    try { await Engine.init(); } catch (e) { const msg = engineErrorMessage(); setStatus(msg, 'err'); toast(msg, 7000); setTool('add'); S.detecting = false; return; }
     if (!S.work) { S.detecting = false; return; }
   }
   setStatus(t('stDetecting'), 'busy');
@@ -606,7 +639,7 @@ async function togglePerson(i) {
   const p = S.people[i]; if (!p || S.busy) return;
   if (p.selected) { pushUndo(); for (let k = 0; k < S.mask.length; k++) S.mask[k] = Math.min(S.mask[k], 1 - (p.mask ? p.mask[k] : 0)); p.selected = false; S.maskVer++; afterMaskChange(); return; }
   if (!p.mask) {
-    if (!Engine.ready) { toast(t('stNoModel')); return; }
+    if (!Engine.ready) { toast(engineErrorMessage(), 7000); return; }
     S.busy = true; setStatus(t('stSegmenting'), 'busy');
     const el = $('markers').children[i]; if (el) el.classList.add('busy');
     await new Promise(r => setTimeout(r, 30));
@@ -974,7 +1007,12 @@ function wire() {
   // engine preload
   const bar = $('modelProgress').firstElementChild;
   Engine.init(p => { bar.style.width = Math.round(p * 100) + '%'; }).then(() => { setTimeout(() => $('modelProgress').hidden = true, 600); if (S.work && !S.people.length) detectPeople(); })
-    .catch(() => { $('modelProgress').hidden = true; if (S.work) { setStatus(t('stNoModel')); setTool('add'); } });
+    .catch(() => {
+      $('modelProgress').hidden = true;
+      const msg = engineErrorMessage();
+      toast(msg, 7000);
+      if (S.work) { setStatus(msg, 'err'); setTool('add'); }
+    });
 }
 wire();
 

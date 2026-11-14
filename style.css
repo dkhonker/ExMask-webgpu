@@ -190,6 +190,7 @@ img { max-width: 100%; }
 .status .dot { width: 6px; height: 6px; border-radius: 50%; background: #7d7b74; flex: none; }
 .status.busy .dot { background: var(--accent); animation: blink 1s infinite; }
 .status.ok .dot { background: #7ee2a0; }
+.status.err .dot { background: #ff3b30; }
 @keyframes blink { 50% { opacity: .25; } }
 
 /* ---------- stage ---------- */
